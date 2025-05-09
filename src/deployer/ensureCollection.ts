@@ -6,84 +6,36 @@ import Deployer from './index'
 
 const { NftItem, NftCollection } = TonWeb.token.nft
 
-// ensureCollection - get collection. if we have one in db - return it
-// if not - deploy new one
 export async function ensureCollection(this: Deployer): Promise<NftCollectionType> {
-  // const collection = await tx<Collection>('collections').first()
   const walletAddress = await this.wallet.getAddress()
 
-  if (typeof this.config.collection.royalty !== 'number') {
-    throw new Error('Wrong collection royalty')
+  if (!this.config.collection.collectionAddress) {
+    throw new Error('[Deployer] Collection address must be provided')
   }
 
-  const createCollectionParams = {
+  this.log('[Deployer] Using collection: ' + this.config.collection.collectionAddress)
+
+  const existingCollection = new NftCollection(this.tonweb.provider, {
+    address: this.config.collection.collectionAddress,
     ownerAddress: walletAddress,
-    royalty: this.config.collection.royalty,
+    royalty: 0,
     royaltyAddress: walletAddress,
-    collectionContentUri: this.config.collection.content,
-    nftItemContentBaseUri: this.config.collection.base,
     nftItemCodeHex: NftItem.codeHex,
-  }
-
-  const nftCollection = new NftCollection(this.tonweb.provider, createCollectionParams)
+  })
 
   try {
-    const collectionData = await callTonApi<ReturnType<typeof nftCollection.getCollectionData>>(
-      () => nftCollection.getCollectionData()
-    )
+    const collectionData = await callTonApi<
+      ReturnType<typeof existingCollection.getCollectionData>
+    >(() => existingCollection.getCollectionData())
 
-    // If we collection is deployed - return it
-    if (collectionData.collectionContentUri !== '') {
-      return nftCollection
+    if (collectionData.nextItemIndex !== undefined) {
+      this.log('[Deployer] Collection verified, next item index: ' + collectionData.nextItemIndex)
+      return existingCollection
+    } else {
+      throw new Error('[Deployer] Collection data not found. Check the collection address')
     }
-  } catch (e) {}
-
-  // Address that deploys everything should have tons
-  await this.ensureDeployerBalance()
-
-  this.log('[Deployer] Deploying new collection')
-  const nftCollectionAddress = await nftCollection.getAddress()
-
-  let seqno = await callTonApi(this.wallet.methods.seqno().call)
-
-  if (seqno === null) {
-    seqno = 0
+  } catch (e: unknown) {
+    const errorMessage = e instanceof Error ? e.message : String(e)
+    throw new Error('[Deployer] Failed to verify collection: ' + errorMessage)
   }
-  if (typeof seqno !== 'number') {
-    throw new Error('[Deployer] Blockchain issue. No seqno found')
-  }
-
-  // Deploy collection
-  await callTonApi(async () =>
-    this.wallet.methods
-      .transfer({
-        secretKey: this.key.secretKey,
-        toAddress: nftCollectionAddress.toString(true, true, false), // non-bounceable
-        amount: TonWeb.utils.toNano(this.config.deployAmount),
-        seqno: typeof seqno === 'number' ? seqno : 0,
-        payload: '', // body
-        sendMode: 3,
-        stateInit: (await nftCollection.createStateInit()).stateInit,
-      })
-      .send()
-  )
-
-  // Make sure that seqno increased from one we used
-  await this.ensureSeqnoInc(seqno)
-
-  try {
-    const newData = await callTonApi<ReturnType<typeof nftCollection.getCollectionData>>(() =>
-      nftCollection.getCollectionData()
-    )
-
-    if (newData.collectionContentUri === '') {
-      throw new Error('[Deployer] Collection data after deploy not found')
-    }
-  } catch (e) {
-    throw new Error('[Deployer] Collection data after deploy not found catch')
-  }
-
-  this.log('[Deployer] Collection deployed')
-
-  return nftCollection
 }

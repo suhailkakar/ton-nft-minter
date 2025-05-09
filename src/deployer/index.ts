@@ -1,4 +1,4 @@
-import TonWeb from 'tonweb' // should be on top
+import TonWeb from 'tonweb'
 import { KeyPair, mnemonicToKeyPair } from 'tonweb-mnemonic'
 import { Config, Nft } from '../models'
 import { callTonApi, delay } from '../utils'
@@ -93,11 +93,14 @@ class Deployer {
         collection.getCollectionData()
       )
 
-      if (collectionData.collectionContentUri === '') {
-        throw new Error("[Deployer] Start error, can't get collection start index")
+      if (collectionData.nextItemIndex === undefined) {
+        throw new Error("[Deployer] Start error, can't get collection next item index")
       }
 
       this.deployIndex = collectionData.nextItemIndex
+      this.log(`[Deployer] Starting from index ${this.deployIndex} (auto-detected from collection)`)
+    } else {
+      this.log(`[Deployer] Starting from index ${this.deployIndex} (manually specified)`)
     }
 
     if (this.nfts.length <= this.deployIndex) {
@@ -132,7 +135,6 @@ class Deployer {
 
     if (this.nfts.length <= this.deployIndex) {
       this.log(`[Deployer] Got no more nfts to deploy ${this.deployIndex}`)
-      // process.exit(0)
       if (typeof this.workInterval === 'number') {
         window.clearTimeout(this.workInterval)
       } else {

@@ -9,16 +9,13 @@ export async function getConfig(): Promise<Config> {
 
     startIndex: process.env.START_INDEX ? parseInt(process.env.START_INDEX, 10) : -1,
 
-    tonApiUrl: process.env.TON_API_URL || 'https://testnet.toncenter.com/api/v2/jsonRPC',
+    tonApiUrl: process.env.TON_API_URL || 'https://toncenter.com/api/v2/jsonRPC',
     tonApiKey: process.env.TON_API_KEY,
 
     collection: {
-      royalty: process.env.COLLECTION_ROYALTY ? parseFloat(process.env.COLLECTION_ROYALTY) : 0,
-      content: process.env.COLLECTION_CONTENT || '',
-      base: process.env.COLLECTION_BASE || '',
+      collectionAddress: process.env.COLLECTION_ADDRESS || '',
     },
 
-    deployAmount: process.env.DEPLOY_AMOUNT || '1',
     topupAmount: process.env.TOPUP_AMOUNT || '1',
   }
 
@@ -60,23 +57,8 @@ export async function checkConfig(c: Config) {
     throw new Error('[Config] TonApiKey error')
   }
 
-  if (!c.collection.royalty) {
-    throw new Error('[Config] Collection Royalty error')
-  }
-
-  if (!c.collection.content) {
-    throw new Error('[Config] Collection Content error')
-  }
-
-  if (!c.collection.base) {
-    throw new Error('[Config] Collection Base error')
-  }
-
-  const fDeployAmount = parseFloat(c.deployAmount)
-  if (isNaN(fDeployAmount)) {
-    throw new Error('[Config] Deploy amount is NaN')
-  } else if (fDeployAmount < 0.1) {
-    throw new Error('[Config] Deploy amount is less than 0.1')
+  if (!c.collection.collectionAddress) {
+    throw new Error('[Config] Collection address must be provided')
   }
 
   const fTopupAmount = parseFloat(c.topupAmount)
